@@ -1,0 +1,61 @@
+version: '3'
+
+name: 'log-collector'
+services:
+
+  mongo:
+    image: 'mongo'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      DB_NAME: $DB_NAME
+      DB_USER: $DB_USER
+      DB_PASSWORD: $DB_PASSWORD
+    networks:
+      - log-collector
+    volumes:
+      - mongodb_data_container:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
+    env_file:
+      - .env
+    # healthcheck:
+    #     test: "echo 'db.runCommand(\"ping\").ok'"
+    #     interval: 5s
+    #     timeout: 5s
+    #     retries: 3
+
+  fluentd:
+    build:
+        context: ./fluentd
+        network: host
+    container_name: fluentd
+    ports:
+        - 9880:9880
+        - 24224:24224
+        - 24224:24224/udp
+    user: fluent
+    volumes:
+        - ./config:/fluentd/etc
+    depends_on:
+      - mongo
+    networks:
+      - log-collector
+
+  mongo-express:
+    image: 'mongo-express'
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://root:root@mongo:27017/
+    networks:
+      - log-collector
+    depends_on:
+      - mongo
+
+networks:
+  log-collector:
+    external: true
+
+volumes:
+  mongodb_data_container:
